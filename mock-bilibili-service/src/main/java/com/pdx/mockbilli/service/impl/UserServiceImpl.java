@@ -9,6 +9,7 @@ import com.pdx.mockbilli.entity.exception.ConditionException;
 import com.pdx.mockbilli.service.UserService;
 import com.pdx.mockbilli.utils.MD5Util;
 import com.pdx.mockbilli.utils.RSAUtil;
+import com.pdx.mockbilli.utils.TokenUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,6 +62,32 @@ public class UserServiceImpl implements UserService {
         userInfo.setGender(UserConstant.GENDER_UNKNOW);
         userInfo.setCreateTime(now);
         userMapper.addUserInfo(userInfo);
+    }
+
+    @Override
+    public String login(User user) {
+        String phone = user.getPhone();
+        if (StringUtils.isNullOrEmpty(phone)){
+            throw new ConditionException("手机号不能为空");
+        }
+        User userByPhone = this.getUserByPhone(phone);
+        if (userByPhone == null){
+            throw new ConditionException("当前用户不存在");
+        }
+        String password = user.getPassword();
+        String rawPassword;
+        try {
+            rawPassword = RSAUtil.decrypt(password);
+        } catch (Exception e) {
+            throw new ConditionException("手机号或者密码错误");
+        }
+        String salt = userByPhone.getSalt();
+        String md5Password = MD5Util.sign(rawPassword,salt,"UTF-8");
+        if (!md5Password.equals(userByPhone.getPassword())){
+            throw new ConditionException("手机号或者密码错误");
+        }
+        String accessToken = TokenUtil.generateToken(userByPhone.getId());
+        return accessToken;
     }
 
     /**
